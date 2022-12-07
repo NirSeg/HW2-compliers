@@ -278,7 +278,7 @@ private:
   Object * atom_;
 };
 
-// not for now
+// no need to touch
 class ExprList : public Object {
 public :
   ExprList (Object * expr) : expr_(expr),expr_list_(NULL){assert(expr_);}
@@ -438,7 +438,7 @@ public :
 class Var : public Atom {
 };
 
-// not for now
+// now for now
 class ArrayRef : public Var {
 public :
   ArrayRef (Object * var, Object * dim) : var_(var),dim_(dim) {assert(var_ && dim_);}
@@ -470,7 +470,7 @@ private:
   Object * dim_;
 };
 
-// not for now
+// now for now
 class RecordRef : public Var {
 public :
   RecordRef (Object * varExt, Object * varIn) : varExt_(varExt),varIn_(varIn) {assert(varExt_ && varIn_);}
@@ -502,7 +502,7 @@ private:
   Object * varIn_;
 };
 
-// not for now
+// now for now
 class AddressRef : public Var {
 public :
   AddressRef (Object * var) : var_(var) {assert(var_);}
@@ -980,7 +980,7 @@ private:
   Object * stat_list_;
 };
 
-// not for now
+// now for now
 class RecordList : public Object {
 public :
   RecordList (Object * var_decl) : record_list_(NULL), var_decl_(var_decl)  { assert(var_decl_);}
@@ -1084,7 +1084,7 @@ private:
   string * name_;
 };
 
-// not for now
+// now for now
 class ArrayType : public Type {
 public :
   ArrayType (int l,int u, Object * type) : low_(l),up_(u),type_(type)  { assert(type_);}
@@ -1113,7 +1113,7 @@ private:
 	int low_,up_;
 };
 
-// not for now
+// now for now
 class RecordType : public Type {
 public :
   RecordType (Object * record_list) : record_list_(record_list)  { assert(record_list_);}
@@ -1141,7 +1141,7 @@ private:
   Object * record_list_;
 };
 
-// not for now
+// now for now
 class AddressType : public Type {
 public :
   AddressType (Object * type) : type_(type)  { assert(type_);}
