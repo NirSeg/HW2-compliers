@@ -533,7 +533,7 @@ private:
 class Statement : public Object {
 };
 
-// not for now
+// now for now
 class NewStatement : public Statement {
 public :
   NewStatement (Object * var) : var_(var) {assert(var_);}
