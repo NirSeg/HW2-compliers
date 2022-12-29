@@ -317,6 +317,7 @@ private:
 };
 
 // not for now
+// now for now, dimentions
 class Dim : public Object {
 public:
   Dim (Object * exp) : exp_(exp), dim_(NULL) {assert(exp_);}
