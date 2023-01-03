@@ -79,11 +79,23 @@
 #include <map>
 #include <iomanip>
 #include <stack>
+#include <vector>
 
 using namespace std;
 
+// the product of the array
+static int arrayProduct(vector<int>& arr, int index = 0){
+  int product = 1;
+  int len = arr.size();
+  for(int i=index; i<len; i++)
+    product *= arr[len - i - 1];
+  return product;
+}
+
 // {new
 static int stackAddress=5;
+// for array
+extern vector<int> arrsizes;
 // new}
 
 // {new
@@ -92,6 +104,12 @@ struct Information
 {
   string type;
   int address, size;
+  // for pointer
+  string pointed = ""; // the variable that the pointer is pointing
+  // for array
+  vector<int> arrSizes;
+  int subPart;
+  string typeArray; // the name of the variables the array is made of
 };
 
 
@@ -101,7 +119,52 @@ class SymbolTable{
   SymbolTable(){
     stackAddress = 5;
   }
-  bool insertVariable(string name, string type, int size){
+  // simpleType
+  bool insertVariable(string name, string type){
+    if(symbolTable[name] != NULL) return false;
+    symbolTable[name] = new Information;
+    symbolTable[name]->type = type;
+    symbolTable[name]->size = 1;
+    symbolTable[name]->address = stackAddress;
+    stackAddress++;
+    return true;
+  }
+  // pointers
+  bool insertPointer(string name, string type, string pointed){
+    if(symbolTable[name] != NULL) return false;
+    symbolTable[name] = new Information;
+    symbolTable[name]->type = type;
+    symbolTable[name]->size = 1;
+    symbolTable[name]->address = stackAddress;
+    symbolTable[name]->pointed = pointed;
+    stackAddress++;
+    return true;
+  }
+  // records
+  bool insertRecord(string name, int address, string type, int size){
+    if(symbolTable[name] != NULL) return false;
+    symbolTable[name] = new Information;
+    symbolTable[name]->type = type;
+    symbolTable[name]->size = size;
+    symbolTable[name]->address = address;
+    return true;
+  }
+  // arrays
+    bool insertArray(string name, string type, int size, int subPart, string typeArray){
+    if(symbolTable[name] != NULL) return false;
+    symbolTable[name] = new Information;
+    symbolTable[name]->type = type;
+    symbolTable[name]->size = size;
+    symbolTable[name]->address = stackAddress;
+    for(int i=0; i<arrsizes.size(); i++)
+      symbolTable[name]->arrSizes.push_back(arrsizes[i]);
+    symbolTable[name]->subPart = subPart;
+    symbolTable[name]->typeArray = typeArray;
+    stackAddress += size;
+    return true;
+  }
+  // else
+  bool insertElse(string name, string type, int size){
     if(symbolTable[name] != NULL) return false;
     symbolTable[name] = new Information;
     symbolTable[name]->type = type;
@@ -114,6 +177,47 @@ class SymbolTable{
     if(symbolTable[name] == NULL) return -1;
     return symbolTable[name]->address;
   }
+
+  int getCurrAddress() {return stackAddress;}
+
+  int getSize(const string& name){
+    if(symbolTable[name] == NULL) return -1;
+    return symbolTable[name]->size;
+  }
+
+  string getType(const string& name){
+    if(symbolTable[name] == NULL) return "";
+    return symbolTable[name]->type;
+  }
+
+  string getPointed(const string& name){
+    if(symbolTable[name] == NULL) return "";
+    return symbolTable[name]->pointed;
+  }
+
+  int getSubpart(const string& name){
+    if(symbolTable[name] == NULL) return -1;
+    return symbolTable[name]->subPart;
+  }
+
+  string getTypeArray(const string& name){
+    if(symbolTable[name] == NULL) return "";
+    return symbolTable[name]->typeArray;
+  }
+  vector<int>& getArrSizes(const string& name){
+    return arrsizes;
+  }
+  void printArrSizes(const string& name, ostream& os){
+    int len = symbolTable[name]->arrSizes.size();
+    for(int i=0; i<len; i++)
+      os << symbolTable[name]->arrSizes[i];
+  }
+  int getSizeArrSizes(const string& name){
+    return symbolTable[name]->arrSizes.size();
+  }
+  int getProductArray(const string& name, int index = 0){
+    return arrayProduct(symbolTable[name]->arrSizes, index);
+  }
   private:
     // map = (name, (type, address, size))
     map<string, Information*> symbolTable;
@@ -125,19 +229,54 @@ class SymbolTable{
 extern bool flagAddConst; // for inc
 extern bool flagSubConst; // for dec
 extern bool flagVariable; // for ind
-extern string typeVariable; // for variable declaration, Simple Type
+// for types
+extern string typeVariable; // says the last type that it was
+extern string nameVariable; // says the last name that it was
+static int sizeVariable; // the size of the variable
+
+// for records
+static stack<int> sizeOfRecord;
+
 static stack<int> counterSwitchStack; // // to count the number of switches
 static int counterIf = 1; // counter for the number of ifs
 static int counterWhile = 1; // counter for the number of whiles
 static int counterSwitch = 1; // counter for the number of switches
 static int counterCase = 1;
+
+
+// for arrays
+extern int subpart;
+extern int sizeArray;
+extern string typearray;
+// for records
 extern SymbolTable symboltable; // for symbol table
+
+// for decleration
+extern bool flagDecleration;
+
+// for RecordRef
+extern bool flagRecordRefInc; // if there was a record ref, that mean ".", for inc
+static int incRecord; // the number that in the inc for the record
+static bool flagLdcRecord = true;
+extern bool flagRecordSizeP; // for a situation in a record ref that we need the size of the pointed
+
+// for array ref
+extern string arrayName;
+extern bool flagVarArray;
+extern int counterDim;
+
+extern bool flagRecordInd;
+
+// for ind 
+extern bool flagNew;
+extern bool flagArray;
+extern bool flagRecord;
 // new}
 
 /*
 all the problems:
-- whiles and switches
-- assignment : idetype : problem doesnt give the real address
+- new statement: done
+- ide type: (to handle the flagVariable)
 */
 
 /**
@@ -191,6 +330,7 @@ public :
   }
   
   void pcodegen(ostream& os) {
+    // for add and sum
     flagAddConst = false; flagSubConst = false;
     assert(op_);
     if (unary_) {      
@@ -316,7 +456,6 @@ private:
 	Object * expr_list_;
 };
 
-// not for now
 // now for now, dimentions
 class Dim : public Object {
 public:
@@ -342,11 +481,29 @@ public:
     }
   }
   void pcodegen(ostream& os) {
-      assert(exp_);
-      exp_->pcodegen(os);
-      if (dim_) {
-          dim_->pcodegen(os);
-      }
+    bool valueFlagLdcRecord=flagLdcRecord;
+    assert(exp_);
+    //{new
+    counterDim++;
+    flagLdcRecord = true;
+    //new}
+    exp_->pcodegen(os);
+    //{new
+    flagLdcRecord = valueFlagLdcRecord;
+    // for ixa
+    if(symboltable.getTypeArray(arrayName) == "Integer" || symboltable.getTypeArray(arrayName) == "Real" || symboltable.getTypeArray(arrayName) == "Boolean")
+      os << "ixa " << symboltable.getProductArray(arrayName, counterDim) << endl;
+    else
+      os << "ixa " << symboltable.getProductArray(arrayName, counterDim) * symboltable.getSize(symboltable.getTypeArray(arrayName)) << endl;
+    if(symboltable.getSizeArrSizes(arrayName) <= counterDim){
+      os << "dec " << symboltable.getSubpart(arrayName) << endl;
+      counterDim = 0;
+      arrayName = symboltable.getTypeArray(arrayName);
+    }
+    //new}
+    if (dim_) {
+        dim_->pcodegen(os);
+    }
   }
   virtual Object * clone () const { return new Dim(*this);}
 
@@ -421,7 +578,7 @@ public:
 
 };
 
-// give false
+//give false
 class False : public Atom {
 public :
   void print (ostream& os) {
@@ -435,7 +592,7 @@ public :
   virtual Object * clone () const { return new False();}
 };
 
-// not for now
+// now for now
 class Var : public Atom {
 };
 
@@ -461,14 +618,34 @@ public :
   }
   void pcodegen(ostream& os) {
       assert(var_ && dim_);
+      //{new
+      // in array
+      flagArray = true;
+      flagVarArray = true;
+      //new}
       var_->pcodegen(os);
+      //{new
+      // initilization of array dim
+      thisCounterDim = counterDim;
+      counterDim = 0;
+      flagVarArray = false;
+      //new}
       dim_->pcodegen(os);
+      //{new
+      counterDim = thisCounterDim;
+      // for ind
+      if(flagVariable && flagArray && !flagNew && !flagRecord)
+        os << "ind" << endl;
+      // out of the array
+      flagArray = false;
+      //new}
   }
   virtual Object * clone () const { return new ArrayRef(*this);}
 
 private:
   Object * var_;
   Object * dim_;
+  int thisCounterDim;
 };
 
 // now for now
@@ -493,8 +670,41 @@ public :
   }
   void pcodegen(ostream& os) {
       assert(varExt_ && varIn_);
+      //{new
+      // in record
+      flagRecord = true;
+      // for ldc
+      bool flagThisLdcRecord = false;
+      // for a situation in a record ref that we need the size of the pointed
+      flagRecordSizeP = true;
+      //new}
+      // name of the record
       varExt_->pcodegen(os);
+      //{new
+      flagRecordSizeP = false;
+      os << "inc ";
+      // for ldc
+      if(flagLdcRecord){
+        flagLdcRecord = false;
+        flagThisLdcRecord = true;
+      }
+      // for the inc of the record
+      flagRecordRefInc = true;
+      // form ind
+      flagRecordInd = true;
+      //new}
+      // variable inside the record
       varIn_->pcodegen(os);
+      //{new
+      flagRecordInd = false;
+      if(flagThisLdcRecord)
+        flagLdcRecord = true;
+      // for ind
+      if(flagVariable && !flagArray && !flagNew && flagRecord)
+        os << "ind" << endl;
+      // out of the record
+      flagRecord = false;
+      //new}
   }
   virtual Object * clone () const { return new RecordRef(*this);}
 
@@ -523,6 +733,11 @@ public :
   void pcodegen(ostream& os) {
       assert(var_);
       var_->pcodegen(os);
+      // {new
+      os << "ind" << endl;
+      // referenceName = nameVariable;
+      typeVariable = "Pointer";
+      // new}
   }
   virtual Object * clone () { return new AddressRef(*this);}
 
@@ -553,7 +768,20 @@ public :
   }
   void pcodegen(ostream& os) {
       assert(var_);
+      //{new
+      // in new
+      flagNew = true;
+      // the variable (we know it is a pointer) 
       var_->pcodegen(os);
+      // the size of the new variable
+      os << "ldc " << sizeVariable << endl;
+      // initializing the size
+      sizeVariable = 0;
+      // statement new
+      os << "new" << endl;
+      // out of new
+      flagNew = false;
+      //new}
   }
   virtual Object * clone () { return new NewStatement(*this);}
   
@@ -589,7 +817,7 @@ private:
   string * str_;
 };
 
-// for now, print variable
+// for now, prints
 class WriteVarStatement : public Statement {
 public :
   WriteVarStatement (Object * exp) : exp_(exp) {assert(exp_);}
@@ -981,7 +1209,7 @@ private:
   Object * stat_list_;
 };
 
-// now for now
+// the list of the variables for decleration inside the record
 class RecordList : public Object {
 public :
   RecordList (Object * var_decl) : record_list_(NULL), var_decl_(var_decl)  { assert(var_decl_);}
@@ -1022,7 +1250,7 @@ private:
 class Type : public Object {
 };
 
-// for now, for declaration
+// declaration for simple variables
 class SimpleType : public Type {
 public:
   SimpleType (const char * name) { 
@@ -1044,6 +1272,11 @@ public:
   void pcodegen(ostream& os) {
     // {new
     typeVariable = *name_;
+    // if in array then its the type of array
+    typearray = *name_;
+    sizeArray = 1;
+    sizeVariable = 1;
+    // os << typearray << endl;
     // new}
   }
   virtual Object * clone () const { return new SimpleType(*this);}
@@ -1052,7 +1285,7 @@ private:
   string * name_;
 };
 
-// for now, for declaration
+// for every time we go to a variable
 class IdeType : public Type {
 public:
   IdeType (const char * name) { 
@@ -1072,11 +1305,46 @@ public:
   }
   void pcodegen(ostream& os) {
     // {new
-    os << "ldc " << symboltable.findAddress(*name_) << endl;
-    if(flagVariable)
-      os << "ind" << endl;
-    flagAddConst = false;
-    flagSubConst = false;
+    // the name of the current array
+    if(flagVarArray)
+      arrayName = *name_;
+    // the size of the variable (for new statement)
+    if(!flagDecleration){
+      // for the inc of the record
+      if(flagRecordRefInc){
+        flagRecordRefInc = false;
+        os << symboltable.findAddress(*name_) - incRecord << endl;
+      }
+      // i think for new
+      if(symboltable.getType(*name_) == "Pointer")
+        sizeVariable = symboltable.getSize(symboltable.getPointed(*name_));
+      // if we need the value from the variable
+      if(flagLdcRecord)
+        os << "ldc " << symboltable.findAddress(*name_) << endl;
+      if(flagVariable && !flagRecordInd && !flagNew && !flagRecord && !flagArray)
+        os << "ind" << endl;
+      // for inc and dec for Exp
+      flagAddConst = false;
+      flagSubConst = false;
+      // for inc of the record
+      if(flagRecordSizeP && symboltable.getType(*name_) == "Pointer")
+        incRecord = symboltable.findAddress(symboltable.getPointed(*name_));
+      else if(flagRecordSizeP && symboltable.getType(*name_) == "Array")
+        incRecord = symboltable.findAddress(symboltable.getTypeArray(*name_));
+      else if(flagRecordSizeP && symboltable.getType(*name_) != "Integer" && symboltable.getType(*name_) != "Real" && symboltable.getType(*name_) != "Boolean" && symboltable.getType(*name_) != "Pointer" && symboltable.getType(*name_) != "Array" && symboltable.getType(*name_) != "Record")
+        incRecord = symboltable.findAddress(symboltable.getType(*name_));
+      else
+        incRecord = symboltable.findAddress(*name_);
+    }
+    else{
+      nameVariable = *name_;
+      sizeVariable = symboltable.getSize(*name_);
+      // if in array then its the type of array
+      typearray = *name_;
+      sizeArray = 1;
+      typeVariable = *name_;
+      // os << typearray << endl;
+    }
     // new}
   }
   virtual Object * clone () const { return new IdeType(*this);}
@@ -1105,7 +1373,18 @@ public :
   }
   void pcodegen(ostream& os) {
       assert(type_);
+      //{new
+      subpart = 0;
+      //new}
       type_->pcodegen(os);
+      //{new
+      // from the nost inner to out
+      sizeArray *= (up_ - low_ + 1);
+      subpart += low_ * sizeVariable * arrayProduct(arrsizes);
+      arrsizes.push_back(up_ - low_ + 1);
+      // os << subpart << endl;
+      typeVariable = "Array";
+      //new}
   }
   virtual Object * clone () const { return new ArrayType(*this);}
 
@@ -1134,7 +1413,15 @@ public :
   }
   void pcodegen(ostream& os) {
       assert(record_list_);
+      //{new
+      // new record so new cell
+      sizeOfRecord.push(0);
+      //new}
       record_list_->pcodegen(os);
+      //{new
+      // name of the variable
+      typeVariable = "Record";
+      //new}
   }
   virtual Object * clone () const { return new RecordType(*this);}
 
@@ -1163,6 +1450,9 @@ public :
   void pcodegen(ostream& os) {
       assert(type_);
       type_->pcodegen(os);
+      //{new
+      typeVariable = "Pointer";
+      //new}
   }
   virtual Object * clone () const { return new AddressType(*this);}
 
@@ -1174,6 +1464,7 @@ private:
 class Declaration : public Object {
 };
 
+//
 class VariableDeclaration : public Declaration {
 public:
   VariableDeclaration (Object * type, const char * str) : type_(type){
@@ -1197,13 +1488,66 @@ public:
 	  type_->print(os);
   }
   void pcodegen(ostream& os) {
-      assert(type_);
-      type_->pcodegen(os);
-      // {new
-      symboltable.insertVariable(*name_, typeVariable, 1);
-      // only for check
-      // os << *name_ << " address is: " << symboltable.findAddress(*name_) << endl;
-      // new}
+    //{new
+    flagDecleration = true;
+    int poped = 0;
+    // for the address of the record
+    int addressRecord = symboltable.getCurrAddress();
+    //new}
+    assert(type_);
+    type_->pcodegen(os);
+    // {new
+    // for simple type
+    if(typeVariable == "Integer" || typeVariable == "Real" || typeVariable  == "Boolean"){
+      symboltable.insertVariable(*name_, typeVariable);
+      // for size of record
+      if(!sizeOfRecord.empty()){
+        poped = ++sizeOfRecord.top();
+        sizeOfRecord.emplace(poped);
+      }
+    }
+    // for record type
+    else if(typeVariable == "Record"){
+      symboltable.insertRecord(*name_, addressRecord, typeVariable, sizeOfRecord.top());
+      // handle if there is multiple records
+      if(sizeOfRecord.size() > 1){
+        poped = sizeOfRecord.top();
+        sizeOfRecord.pop();
+        poped += sizeOfRecord.top();
+        sizeOfRecord.emplace(poped);
+      }
+      else
+        sizeOfRecord.pop();
+    }
+    // for pointer type
+    else if(typeVariable == "Pointer"){
+      symboltable.insertPointer(*name_, typeVariable, nameVariable);
+      if(!sizeOfRecord.empty()){
+        poped = ++sizeOfRecord.top();
+        sizeOfRecord.emplace(poped);
+      }
+    }
+    // for array type
+    else if(typeVariable == "Array"){
+      sizeArray *= sizeVariable;
+      symboltable.insertArray(*name_, typeVariable, sizeArray, subpart, typearray);
+      if(!sizeOfRecord.empty()){
+        poped = sizeOfRecord.top() + symboltable.getSize(*name_);
+        sizeOfRecord.emplace(poped);
+      }
+      arrsizes.clear();
+    }
+    else{
+      symboltable.insertElse(*name_, typeVariable, symboltable.getSize(typeVariable));
+      if(!sizeOfRecord.empty()){
+        poped = sizeOfRecord.top() + symboltable.getSize(*name_);
+        sizeOfRecord.emplace(poped);
+      }
+    }
+    // returning the name of the variable
+    // flag of the decleration
+    flagDecleration = false;
+    // new}
   }
   virtual Object * clone () const { return new VariableDeclaration(*this);}
 
@@ -1517,6 +1861,9 @@ public :
       block_->pcodegen(os);
       // {new
       flagVariable = true;
+      flagDecleration = true;
+      flagRecordRefInc = false;
+      flagLdcRecord = true;
       // new}
   }
   virtual Object * clone () const { return new Program(*this);}

@@ -22,7 +22,32 @@ bool flagAddConst; // for inc
 bool flagSubConst; // for dec
 bool flagVariable; // for ind
 string typeVariable; // for variable declaration, Simple Type
+string nameVariable; // 
+bool flagDecleration;
 SymbolTable symboltable; // for symbol table
+
+// for arrays
+int subpart;
+int sizeArray;
+string typearray;
+vector<int> arrsizes;
+
+// for RecordRef
+bool flagRecordRefInc; // if there was a record ref, that mean "."
+//bool flagLdcRecord; // for the ldc of record
+bool flagRecordSizeP; // for a situation in a record ref that we need the size of the pointed
+
+// for array ref
+string arrayName;
+bool flagVarArray;
+int counterDim;
+
+bool flagRecordInd;
+
+// for ind 
+bool flagNew;
+bool flagArray;
+bool flagRecord;
 // new}
 
 void writeAST(Object* r, fstream& file)
