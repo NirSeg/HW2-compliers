@@ -150,7 +150,7 @@ class SymbolTable{
     return true;
   }
   // arrays
-    bool insertArray(string name, string type, int size, int subPart, string typeArray){
+  bool insertArray(string name, string type, int size, int subPart, string typeArray){
     if(symbolTable[name] != NULL) return false;
     symbolTable[name] = new Information;
     symbolTable[name]->type = type;
@@ -161,6 +161,19 @@ class SymbolTable{
     symbolTable[name]->subPart = subPart;
     symbolTable[name]->typeArray = typeArray;
     stackAddress += size;
+    return true;
+  }
+  // insert array of pointer
+  bool insertArrayOfPointer(string name, string type, int size, int subPart, string typeArray){
+    if(symbolTable[name] != NULL) return false;
+    symbolTable[name] = new Information;
+    symbolTable[name]->type = type;
+    symbolTable[name]->size = size;
+    symbolTable[name]->address = -123;
+    for(int i=0; i<arrsizes.size(); i++)
+        symbolTable[name]->arrSizes.push_back(arrsizes[i]);
+    symbolTable[name]->subPart = subPart;
+    symbolTable[name]->typeArray = typeArray;
     return true;
   }
   // else
@@ -271,6 +284,12 @@ extern bool flagRecordInd;
 extern bool flagNew;
 extern bool flagArray;
 extern bool flagRecord;
+
+// for pointer to array
+extern bool flagPointerArray;
+
+// counts the number of ^ (= *)
+extern int addressRefCounter;
 // new}
 
 /*
@@ -1317,6 +1336,7 @@ public:
       }
       // i think for new
       if(symboltable.getType(*name_) == "Pointer")
+        for(int i=0; i<addressRefCounter; i++)
         sizeVariable = symboltable.getSize(symboltable.getPointed(*name_));
       // if we need the value from the variable
       if(flagLdcRecord)
@@ -1384,6 +1404,8 @@ public :
       arrsizes.push_back(up_ - low_ + 1);
       // os << subpart << endl;
       typeVariable = "Array";
+      // if this is an array of a pointer
+      flagPointerArray = true;
       //new}
   }
   virtual Object * clone () const { return new ArrayType(*this);}
@@ -1521,7 +1543,13 @@ public:
     }
     // for pointer type
     else if(typeVariable == "Pointer"){
-      symboltable.insertPointer(*name_, typeVariable, nameVariable);
+      if(flagPointerArray){
+        sizeArray *= sizeVariable;
+        symboltable.insertArrayOfPointer(*name_ + "-array", "Array", sizeArray, subpart, typearray);
+        symboltable.insertPointer(*name_, typeVariable, *name_ + "-array");
+      }
+      else
+        symboltable.insertPointer(*name_, typeVariable, nameVariable);
       if(!sizeOfRecord.empty()){
         poped = ++sizeOfRecord.top();
         sizeOfRecord.emplace(poped);
@@ -1547,6 +1575,8 @@ public:
     // returning the name of the variable
     // flag of the decleration
     flagDecleration = false;
+    // we enter new decleration, we need to initlize this pointer
+    flagPointerArray = false;
     // new}
   }
   virtual Object * clone () const { return new VariableDeclaration(*this);}
